@@ -86,6 +86,7 @@ export interface ReconciliationRecord {
   totalAmount: number
   status: 'pending' | 'confirmed'
   waybillCount: number
+  waybillIds: string[]
   createdAt: string
   confirmedAt?: string
   downloadUrl?: string

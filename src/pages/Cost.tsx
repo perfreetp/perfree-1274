@@ -15,7 +15,7 @@ import {
   FileBadge2,
   Package,
   Trash2,
-  FileInvoice,
+  XCircle,
 } from 'lucide-react'
 import { useStore } from '@/store'
 import { cargoCategories, stations, mockCostItems } from '@/data/mockData'
@@ -130,6 +130,8 @@ export default function Cost() {
   const [invoiceType, setInvoiceType] = useState('增值税专用发票')
   const [invoiceAmount, setInvoiceAmount] = useState(0)
   const [savedToast, setSavedToast] = useState(false)
+  const [deletedToast, setDeletedToast] = useState(false)
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null)
 
   const [invoiceWaybillId, setInvoiceWaybillId] = useState('')
 
@@ -227,20 +229,31 @@ export default function Cost() {
   }
 
   const downloadReconciliation = (recon: ReconciliationRecord) => {
-    const rows = buildReconciliationRows(recon, filteredDetailWaybills.slice(0, recon.waybillCount))
-    downloadCSV(`对账单_${recon.id}.csv`, rows)
+    const relatedWaybills = recon.waybillIds
+      .map((id) => waybills.find((w) => w.id === id))
+      .filter((w): w is Waybill => !!w)
+    const rows = buildReconciliationRows(recon, relatedWaybills)
+    downloadCSV(`对账单_${recon.id}_${recon.period}.csv`, rows)
   }
 
   const downloadInvoiceFile = (inv: InvoiceApplication) => {
-    const related = invoiceWaybillId ? waybills.filter((w) => w.id === invoiceWaybillId) : waybills.slice(0, 2)
+    const related = inv.waybillId
+      ? waybills.filter((w) => w.id === inv.waybillId)
+      : waybills.slice(0, 2)
     const rows = buildInvoiceRows(inv, related)
     downloadCSV(`发票_${inv.id}.csv`, rows)
   }
 
   const handleDeleteTrial = (id: string) => {
-    if (confirm('确定删除该试算记录？')) {
-      deleteCostTrial(id)
-    }
+    setConfirmDeleteId(id)
+  }
+
+  const confirmDeleteTrial = () => {
+    if (!confirmDeleteId) return
+    deleteCostTrial(confirmDeleteId)
+    setConfirmDeleteId(null)
+    setDeletedToast(true)
+    setTimeout(() => setDeletedToast(false), 2000)
   }
 
   const invoiceStatusMap: Record<string, { label: string; color: string; step: number }> = {
@@ -256,6 +269,44 @@ export default function Cost() {
       {savedToast && (
         <div className="fixed top-20 right-10 bg-green-500 text-white px-4 py-2 rounded-lg shadow-lg text-sm z-50 flex items-center gap-2 animate-pulse">
           <CheckCheck size={16} /> 试算记录已保存
+        </div>
+      )}
+      {deletedToast && (
+        <div className="fixed top-20 right-10 bg-red-500 text-white px-4 py-2 rounded-lg shadow-lg text-sm z-50 flex items-center gap-2 animate-pulse">
+          <Trash2 size={16} /> 试算记录已删除
+        </div>
+      )}
+
+      {confirmDeleteId && (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
+          <div className="bg-white rounded-xl p-6 w-96 shadow-2xl">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-10 h-10 rounded-full bg-red-100 flex items-center justify-center flex-shrink-0">
+                <XCircle size={20} className="text-red-500" />
+              </div>
+              <div>
+                <h3 className="text-base font-semibold text-gray-800">确认删除试算记录</h3>
+                <p className="text-xs text-gray-500 mt-0.5">编号：{confirmDeleteId}</p>
+              </div>
+            </div>
+            <p className="text-sm text-gray-600 mb-5">
+              删除后无法恢复，确定要删除这条试算记录吗？
+            </p>
+            <div className="flex gap-3">
+              <button
+                onClick={() => setConfirmDeleteId(null)}
+                className="flex-1 btn-secondary py-2 text-sm"
+              >
+                取消
+              </button>
+              <button
+                onClick={confirmDeleteTrial}
+                className="flex-1 bg-red-500 hover:bg-red-600 text-white py-2 rounded-lg text-sm font-medium transition-colors"
+              >
+                确认删除
+              </button>
+            </div>
+          </div>
         </div>
       )}
 
@@ -513,7 +564,7 @@ export default function Cost() {
                         onClick={() => handleQuickInvoice(waybill, totalAmount)}
                         className="btn-copper text-xs py-1.5 px-3 flex items-center gap-1"
                       >
-                        <FileInvoice size={12} /> 申请开票
+                        <Receipt size={12} /> 申请开票
                       </button>
                     </div>
                   </div>

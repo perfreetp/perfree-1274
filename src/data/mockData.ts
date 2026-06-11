@@ -228,9 +228,9 @@ export const mockChatSessions: ChatSession[] = [
 ]
 
 export const mockReconciliations: ReconciliationRecord[] = [
-  { id: 'rc1', period: '2026年5月', totalAmount: 256800, status: 'confirmed', waybillCount: 8, createdAt: '2026-06-01', confirmedAt: '2026-06-02', downloadUrl: 'reconciliation-rc1.pdf' },
-  { id: 'rc2', period: '2026年4月', totalAmount: 198500, status: 'confirmed', waybillCount: 6, createdAt: '2026-05-02', confirmedAt: '2026-05-05', downloadUrl: 'reconciliation-rc2.pdf' },
-  { id: 'rc3', period: '2026年6月', totalAmount: 78000, status: 'pending', waybillCount: 3, createdAt: '2026-06-10' },
+  { id: 'rc1', period: '2026年5月', totalAmount: 256800, status: 'confirmed', waybillCount: 3, waybillIds: ['YD2026060004', 'YD2026060001', 'YD2026060003'], createdAt: '2026-06-01', confirmedAt: '2026-06-02', downloadUrl: 'reconciliation-rc1.pdf' },
+  { id: 'rc2', period: '2026年4月', totalAmount: 198500, status: 'confirmed', waybillCount: 1, waybillIds: ['YD2026060004'], createdAt: '2026-05-02', confirmedAt: '2026-05-05', downloadUrl: 'reconciliation-rc2.pdf' },
+  { id: 'rc3', period: '2026年6月', totalAmount: 78000, status: 'pending', waybillCount: 2, waybillIds: ['YD2026060002', 'YD2026060003'], createdAt: '2026-06-10' },
 ]
 
 export const mockInvoices: InvoiceApplication[] = [
