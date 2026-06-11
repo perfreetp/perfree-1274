@@ -23,15 +23,21 @@ export default function Exception() {
   const sendMessage = useStore((s) => s.sendMessage)
   const [selectedSession, setSelectedSession] = useState(chatSessions[0]?.id || '')
   const markSessionRead = useStore((s) => s.markSessionRead)
+  const setActiveSession = useStore((s) => s.setActiveSession)
 
   const handleSelectSession = (id: string) => {
     setSelectedSession(id)
-    markSessionRead(id)
+    setActiveSession(id)
   }
 
   useEffect(() => {
-    if (selectedSession) markSessionRead(selectedSession)
-  }, [selectedSession, markSessionRead])
+    if (selectedSession) {
+      setActiveSession(selectedSession)
+    }
+    return () => {
+      setActiveSession(null)
+    }
+  }, [selectedSession, setActiveSession])
 
   const [excType, setExcType] = useState<ExceptionCase['type']>('damage')
   const [excWaybillId, setExcWaybillId] = useState('')
@@ -98,7 +104,6 @@ export default function Exception() {
         type: 'text',
       }
       sendMessage(selectedSession, reply)
-      markSessionRead(selectedSession)
     }, 1500)
   }
 

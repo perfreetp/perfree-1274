@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import {
   Calculator,
   FileText,
@@ -14,24 +14,112 @@ import {
   CheckCheck,
   FileBadge2,
   Package,
+  Trash2,
+  FileInvoice,
 } from 'lucide-react'
 import { useStore } from '@/store'
 import { cargoCategories, stations, mockCostItems } from '@/data/mockData'
 import { cn } from '@/lib/utils'
-import type { InvoiceApplication, CostTrial } from '@/types'
+import type { InvoiceApplication, CostTrial, ReconciliationRecord, Waybill, CostItem } from '@/types'
 
 type TabKey = 'calculate' | 'history' | 'detail' | 'reconcile' | 'invoice'
+
+const parseDate = (str: string): number => {
+  if (!str) return 0
+  const s = str.replace(/\//g, '-').replace(/年|月/g, '-').replace(/日/g, '')
+  const dt = new Date(s)
+  return dt.getTime()
+}
+
+const toDateInput = (dateStr: string): string => {
+  const ts = parseDate(dateStr)
+  if (!ts) return ''
+  const d = new Date(ts)
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+}
+
+const downloadCSV = (filename: string, rows: string[][]) => {
+  const bom = '\uFEFF'
+  const csv = bom + rows.map((row) => row.map((cell) => `"${String(cell).replace(/"/g, '""')}"`).join(',')).join('\n')
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
+  const url = URL.createObjectURL(blob)
+  const link = document.createElement('a')
+  link.href = url
+  link.setAttribute('download', filename)
+  document.body.appendChild(link)
+  link.click()
+  document.body.removeChild(link)
+  URL.revokeObjectURL(url)
+}
+
+const buildReconciliationRows = (recon: ReconciliationRecord, waybills: Waybill[]): string[][] => {
+  const header = ['对账单号', recon.id]
+  const period = ['对账期间', recon.period]
+  const count = ['运单笔数', `${recon.waybillCount} 笔`]
+  const created = ['生成日期', recon.createdAt]
+  const confirmed = ['确认日期', recon.confirmedAt || '-']
+  const total = ['对账总金额', `¥${recon.totalAmount.toLocaleString()}`]
+  const blank = ['']
+  const tableHeader = ['序号', '运单号', '发站', '到站', '货类', '重量(吨)', '状态', '金额(元)']
+  const dataRows = waybills.map((w, idx) => {
+    const items = mockCostItems[w.id] || []
+    const sum = items.reduce((s, i) => s + i.amount, 0) || w.estimatedCost
+    const cg = cargoCategories.find((c) => c.id === w.cargoType)
+    const statusMap: Record<string, string> = { pending: '待审核', approved: '已审核', in_transit: '在途', arrived: '已到站' }
+    return [
+      String(idx + 1),
+      w.id,
+      w.originStation,
+      w.destinationStation,
+      cg ? `${cg.icon} ${cg.name}` : w.cargoType,
+      String(w.weight),
+      statusMap[w.status] || w.status,
+      String(sum),
+    ]
+  })
+  const footer = ['合计', '', '', '', '', '', '', `¥${recon.totalAmount.toLocaleString()}`]
+  return [header, period, count, created, confirmed, total, blank, tableHeader, ...dataRows, footer]
+}
+
+const buildInvoiceRows = (inv: InvoiceApplication, waybills: Waybill[]): string[][] => {
+  const header = ['发票号', inv.invoiceNo || inv.id]
+  const type = ['发票类型', inv.type]
+  const title = ['开票抬头', inv.title]
+  const amount = ['开票金额', `¥${inv.amount.toLocaleString()}`]
+  const created = ['申请日期', inv.createdAt]
+  const approved = ['审核日期', inv.approvedAt || '-']
+  const issued = ['开票日期', inv.issuedAt || '-']
+  const blank = ['']
+  const tableHeader = ['序号', '运单号', '费用类别', '说明', '金额(元)']
+  const dataRows: string[][] = []
+  let idx = 1
+  waybills.forEach((w) => {
+    const items: CostItem[] = mockCostItems[w.id] || (w.estimatedCost ? [
+      { id: 'auto-1', waybillId: w.id, category: '运费', amount: Math.round(w.estimatedCost * 0.82), description: `预估运费 ${w.weight}吨` },
+      { id: 'auto-2', waybillId: w.id, category: '装卸费', amount: w.weight * 15, description: `装卸费 ${w.weight}吨 × 15元/吨` },
+      { id: 'auto-3', waybillId: w.id, category: '其他费', amount: Math.max(0, w.estimatedCost - Math.round(w.estimatedCost * 0.82) - w.weight * 15), description: '其他预估费用' },
+    ] : [])
+    items.forEach((it) => {
+      dataRows.push([String(idx), w.id, it.category, it.description, String(it.amount)])
+      idx++
+    })
+  })
+  const footer = ['合计', '', '', '', `¥${inv.amount.toLocaleString()}`]
+  return [header, type, title, amount, created, approved, issued, blank, tableHeader, ...dataRows, footer]
+}
 
 export default function Cost() {
   const [activeTab, setActiveTab] = useState<TabKey>('calculate')
   const waybills = useStore((s) => s.waybills)
   const reconciliations = useStore((s) => s.reconciliations)
   const invoices = useStore((s) => s.invoices)
+  const contacts = useStore((s) => s.contacts)
   const addInvoice = useStore((s) => s.addInvoice)
   const updateInvoiceStatus = useStore((s) => s.updateInvoiceStatus)
   const confirmReconciliation = useStore((s) => s.confirmReconciliation)
   const costTrials = useStore((s) => s.costTrials)
   const addCostTrial = useStore((s) => s.addCostTrial)
+  const deleteCostTrial = useStore((s) => s.deleteCostTrial)
 
   const [calcCargo, setCalcCargo] = useState('')
   const [calcOrigin, setCalcOrigin] = useState('')
@@ -42,6 +130,8 @@ export default function Cost() {
   const [invoiceType, setInvoiceType] = useState('增值税专用发票')
   const [invoiceAmount, setInvoiceAmount] = useState(0)
   const [savedToast, setSavedToast] = useState(false)
+
+  const [invoiceWaybillId, setInvoiceWaybillId] = useState('')
 
   const [detailWaybillQuery, setDetailWaybillQuery] = useState('')
   const [detailDateFrom, setDetailDateFrom] = useState('')
@@ -59,6 +149,8 @@ export default function Cost() {
     { key: 'invoice', label: '发票申请', icon: Receipt },
   ]
 
+  const defaultTitle = contacts.find((c) => c.type === 'shipper')?.company || ''
+
   const cargo = cargoCategories.find((c) => c.id === calcCargo)
   const calcDistance = 1200
   const baseCost = calcWeight && cargo ? Math.round(calcWeight * cargo.rate * calcDistance) : 0
@@ -67,27 +159,32 @@ export default function Cost() {
   const totalCost = baseCost + loadingCost + otherCost
 
   const allVisibleWaybills = waybills.filter((w) => w.status !== 'rejected' && w.status !== 'draft')
-  const filteredDetailWaybills = allVisibleWaybills.filter((w) => {
+  const filteredDetailWaybills = useMemo(() => allVisibleWaybills.filter((w) => {
     if (detailWaybillQuery && !w.id.toLowerCase().includes(detailWaybillQuery.toLowerCase())) return false
-    if (detailDateFrom && w.createdAt < detailDateFrom) return false
-    if (detailDateTo && w.createdAt > detailDateTo + ' 23:59') return false
+    const wts = parseDate(w.createdAt)
+    if (detailDateFrom && wts < parseDate(detailDateFrom + ' 00:00:00')) return false
+    if (detailDateTo && wts > parseDate(detailDateTo + ' 23:59:59')) return false
     return true
-  })
+  }), [allVisibleWaybills, detailWaybillQuery, detailDateFrom, detailDateTo])
 
-  const filteredTrials = costTrials.filter((t) => {
+  const filteredTrials = useMemo(() => costTrials.filter((t) => {
     if (historyQuery) {
       const q = historyQuery.toLowerCase()
       if (!t.id.toLowerCase().includes(q) &&
           !t.originStation.includes(historyQuery) &&
           !t.destinationStation.includes(historyQuery)) return false
     }
-    if (historyDateFrom && t.createdAt < historyDateFrom) return false
-    if (historyDateTo && t.createdAt > historyDateTo + ' 23:59') return false
+    const tts = parseDate(t.createdAt)
+    if (historyDateFrom && tts < parseDate(historyDateFrom + ' 00:00:00')) return false
+    if (historyDateTo && tts > parseDate(historyDateTo + ' 23:59:59')) return false
     return true
-  })
+  }), [costTrials, historyQuery, historyDateFrom, historyDateTo])
 
   const handleSaveTrial = () => {
     if (!calcCargo || !calcOrigin || !calcDest || !calcWeight) return
+    const now = new Date()
+    const pad = (n: number) => String(n).padStart(2, '0')
+    const isoDate = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())} ${pad(now.getHours())}:${pad(now.getMinutes())}:${pad(now.getSeconds())}`
     const trial: CostTrial = {
       id: `CT${Date.now()}`,
       cargoType: calcCargo,
@@ -98,7 +195,7 @@ export default function Cost() {
       loadingCost,
       otherCost,
       totalCost,
-      createdAt: new Date().toLocaleString('zh-CN'),
+      createdAt: isoDate,
     }
     addCostTrial(trial)
     setSavedToast(true)
@@ -114,14 +211,36 @@ export default function Cost() {
       type: invoiceType,
       status: 'pending',
       createdAt: new Date().toLocaleDateString('zh-CN'),
+      waybillId: invoiceWaybillId || undefined,
     }
     addInvoice(invoice)
     setInvoiceTitle('')
     setInvoiceAmount(0)
+    setInvoiceWaybillId('')
   }
 
-  const simulateDownload = (fileName: string, label: string) => {
-    alert(`正在下载：${label}（${fileName}）`)
+  const handleQuickInvoice = (waybill: Waybill, totalAmount: number) => {
+    setInvoiceWaybillId(waybill.id)
+    setInvoiceAmount(totalAmount)
+    setInvoiceTitle(defaultTitle)
+    setActiveTab('invoice')
+  }
+
+  const downloadReconciliation = (recon: ReconciliationRecord) => {
+    const rows = buildReconciliationRows(recon, filteredDetailWaybills.slice(0, recon.waybillCount))
+    downloadCSV(`对账单_${recon.id}.csv`, rows)
+  }
+
+  const downloadInvoiceFile = (inv: InvoiceApplication) => {
+    const related = invoiceWaybillId ? waybills.filter((w) => w.id === invoiceWaybillId) : waybills.slice(0, 2)
+    const rows = buildInvoiceRows(inv, related)
+    downloadCSV(`发票_${inv.id}.csv`, rows)
+  }
+
+  const handleDeleteTrial = (id: string) => {
+    if (confirm('确定删除该试算记录？')) {
+      deleteCostTrial(id)
+    }
   }
 
   const invoiceStatusMap: Record<string, { label: string; color: string; step: number }> = {
@@ -294,6 +413,7 @@ export default function Cost() {
                   <th className="text-right text-xs font-medium text-gray-500 pb-3">运费</th>
                   <th className="text-right text-xs font-medium text-gray-500 pb-3">总费用</th>
                   <th className="text-left text-xs font-medium text-gray-500 pb-3">试算时间</th>
+                  <th className="text-center text-xs font-medium text-gray-500 pb-3 w-16">操作</th>
                 </tr>
               </thead>
               <tbody>
@@ -309,6 +429,15 @@ export default function Cost() {
                       <td className="py-3 text-sm text-gray-600 text-right">¥{t.baseCost.toLocaleString()}</td>
                       <td className="py-3 text-sm text-copper-600 font-semibold text-right">¥{t.totalCost.toLocaleString()}</td>
                       <td className="py-3 text-xs text-gray-400">{t.createdAt}</td>
+                      <td className="py-3 text-center">
+                        <button
+                          onClick={() => handleDeleteTrial(t.id)}
+                          className="p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded transition-colors"
+                          title="删除"
+                        >
+                          <Trash2 size={14} />
+                        </button>
+                      </td>
                     </tr>
                   )
                 })}
@@ -366,20 +495,28 @@ export default function Cost() {
             return (
               <div key={waybill.id} className="card p-5">
                 <div className="flex items-center justify-between mb-4">
-                  <div className="flex items-center gap-3 flex-wrap">
-                    <span className="text-sm font-medium text-rail-600">{waybill.id}</span>
-                    <span className={`status-badge ${statusMap[waybill.status]?.color || 'bg-gray-100'}`}>
-                      {statusMap[waybill.status]?.label}
-                    </span>
-                    <span className="text-xs text-gray-500">
-                      {cargoInfo?.icon} {cargoInfo?.name} · {waybill.originStation} → {waybill.destinationStation}
-                    </span>
-                    <span className="text-[10px] text-gray-400">提交时间 {waybill.createdAt}</span>
+                    <div className="flex items-center gap-3 flex-wrap">
+                      <span className="text-sm font-medium text-rail-600">{waybill.id}</span>
+                      <span className={`status-badge ${statusMap[waybill.status]?.color || 'bg-gray-100'}`}>
+                        {statusMap[waybill.status]?.label}
+                      </span>
+                      <span className="text-xs text-gray-500">
+                        {cargoInfo?.icon} {cargoInfo?.name} · {waybill.originStation} → {waybill.destinationStation}
+                      </span>
+                      <span className="text-[10px] text-gray-400">提交时间 {waybill.createdAt}</span>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <span className="text-sm font-semibold text-gray-800">
+                        合计：¥{totalAmount.toLocaleString()}
+                      </span>
+                      <button
+                        onClick={() => handleQuickInvoice(waybill, totalAmount)}
+                        className="btn-copper text-xs py-1.5 px-3 flex items-center gap-1"
+                      >
+                        <FileInvoice size={12} /> 申请开票
+                      </button>
+                    </div>
                   </div>
-                  <span className="text-sm font-semibold text-gray-800">
-                    合计：¥{totalAmount.toLocaleString()}
-                  </span>
-                </div>
                 {items.length > 0 ? (
                   <table className="w-full">
                     <thead>
@@ -477,7 +614,7 @@ export default function Cost() {
                         </button>
                       ) : (
                         <button
-                          onClick={() => simulateDownload(recon.downloadUrl || '', `${recon.period}对账单`)}
+                          onClick={() => downloadReconciliation(recon)}
                           className="btn-copper flex-1 flex items-center justify-center gap-2"
                         >
                           <Download size={16} /> 下载对账单
@@ -501,6 +638,17 @@ export default function Cost() {
         <div className="grid grid-cols-5 gap-6">
           <div className="col-span-2 card p-6">
             <h3 className="text-base font-semibold text-gray-800 mb-4">申请发票</h3>
+            {invoiceWaybillId && (
+              <div className="mb-4 p-3 bg-copper-50 border border-copper-200 rounded-lg text-xs text-copper-700">
+                <span className="font-medium">已选择运单：</span> {invoiceWaybillId}
+                <button
+                  onClick={() => setInvoiceWaybillId('')}
+                  className="ml-2 text-copper-500 hover:text-copper-700 underline"
+                >
+                  取消选择
+                </button>
+              </div>
+            )}
             <div className="space-y-4">
               <div>
                 <label className="label-text">开票抬头</label>
@@ -603,7 +751,7 @@ export default function Cost() {
                         )}
                         {inv.status === 'issued' && (
                           <button
-                            onClick={() => simulateDownload(inv.downloadUrl || '', `发票 ${inv.id}`)}
+                            onClick={() => downloadInvoiceFile(inv)}
                             className="btn-primary text-xs py-1.5 px-3 flex items-center justify-center gap-1 flex-1"
                           >
                             <Download size={12} /> 下载电子发票

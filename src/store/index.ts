@@ -12,6 +12,7 @@ interface AppState {
   invoices: InvoiceApplication[]
   loadingAppointments: LoadingAppointment[]
   costTrials: CostTrial[]
+  activeSessionId: string | null
 
   addWaybill: (waybill: Waybill) => void
   updateWaybillStatus: (id: string, status: Waybill['status']) => void
@@ -21,6 +22,7 @@ interface AppState {
   addException: (exception: ExceptionCase) => void
   sendMessage: (sessionId: string, message: ChatMessage) => void
   markSessionRead: (sessionId: string) => void
+  setActiveSession: (sessionId: string | null) => void
   markNotificationRead: (id: string) => void
   markAllNotificationsRead: () => void
   confirmReconciliation: (id: string) => void
@@ -28,9 +30,10 @@ interface AppState {
   updateInvoiceStatus: (id: string, status: InvoiceApplication['status']) => void
   addLoadingAppointment: (appointment: LoadingAppointment) => void
   addCostTrial: (trial: CostTrial) => void
+  deleteCostTrial: (id: string) => void
 }
 
-export const useStore = create<AppState>((set) => ({
+export const useStore = create<AppState>((set, get) => ({
   waybills: mockWaybills,
   contacts: mockContacts,
   exceptions: mockExceptions,
@@ -40,6 +43,7 @@ export const useStore = create<AppState>((set) => ({
   invoices: mockInvoices,
   loadingAppointments: mockLoadingAppointments,
   costTrials: mockCostTrials,
+  activeSessionId: null,
 
   addWaybill: (waybill) =>
     set((state) => ({ waybills: [...state.waybills, waybill] })),
@@ -70,19 +74,22 @@ export const useStore = create<AppState>((set) => ({
     set((state) => ({ exceptions: [...state.exceptions, exception] })),
 
   sendMessage: (sessionId, message) =>
-    set((state) => ({
-      chatSessions: state.chatSessions.map((s) =>
-        s.id === sessionId
-          ? {
-              ...s,
-              messages: [...s.messages, message],
-              lastMessage: message.content,
-              lastTime: message.time,
-              unread: message.sender === 'service' ? s.unread + 1 : s.unread,
-            }
-          : s
-      ),
-    })),
+    set((state) => {
+      const isActive = get().activeSessionId === sessionId
+      return {
+        chatSessions: state.chatSessions.map((s) =>
+          s.id === sessionId
+            ? {
+                ...s,
+                messages: [...s.messages, message],
+                lastMessage: message.content,
+                lastTime: message.time,
+                unread: message.sender === 'service' && !isActive ? s.unread + 1 : s.unread,
+              }
+            : s
+        ),
+      }
+    }),
 
   markSessionRead: (sessionId) =>
     set((state) => ({
@@ -90,6 +97,17 @@ export const useStore = create<AppState>((set) => ({
         s.id === sessionId ? { ...s, unread: 0 } : s
       ),
     })),
+
+  setActiveSession: (sessionId) =>
+    set((state) => {
+      const nextState = { activeSessionId: sessionId } as Partial<AppState>
+      if (sessionId) {
+        nextState.chatSessions = state.chatSessions.map((s) =>
+          s.id === sessionId ? { ...s, unread: 0 } : s
+        )
+      }
+      return nextState
+    }),
 
   markNotificationRead: (id) =>
     set((state) => ({
@@ -148,4 +166,7 @@ export const useStore = create<AppState>((set) => ({
 
   addCostTrial: (trial) =>
     set((state) => ({ costTrials: [trial, ...state.costTrials] })),
+
+  deleteCostTrial: (id) =>
+    set((state) => ({ costTrials: state.costTrials.filter((t) => t.id !== id) })),
 }))

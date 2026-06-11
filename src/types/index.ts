@@ -102,6 +102,7 @@ export interface InvoiceApplication {
   issuedAt?: string
   invoiceNo?: string
   downloadUrl?: string
+  waybillId?: string
 }
 
 export interface LoadingAppointment {
