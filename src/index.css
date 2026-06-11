@@ -1,0 +1,66 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  font-family: "Noto Sans SC", system-ui, -apple-system, sans-serif;
+  line-height: 1.5;
+  font-weight: 400;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+body {
+  margin: 0;
+  background-color: #f0f4f8;
+  color: #1a202c;
+}
+
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #c1c9d4;
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #a0aab5;
+}
+
+@layer components {
+  .card {
+    @apply bg-white rounded-lg border border-gray-100 shadow-sm;
+  }
+  .btn-primary {
+    @apply bg-rail-500 text-white px-5 py-2.5 rounded-md font-medium
+      hover:bg-rail-600 transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed;
+  }
+  .btn-secondary {
+    @apply border border-rail-500 text-rail-500 px-5 py-2.5 rounded-md font-medium
+      hover:bg-rail-50 transition-colors duration-200;
+  }
+  .btn-copper {
+    @apply bg-copper-500 text-white px-5 py-2.5 rounded-md font-medium
+      hover:bg-copper-600 transition-colors duration-200;
+  }
+  .input-field {
+    @apply w-full px-3 py-2.5 border border-gray-200 rounded-md text-sm
+      focus:outline-none focus:ring-2 focus:ring-rail-300 focus:border-rail-500
+      transition-all duration-200 bg-white;
+  }
+  .label-text {
+    @apply block text-sm font-medium text-gray-700 mb-1.5;
+  }
+  .status-badge {
+    @apply inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium;
+  }
+}
