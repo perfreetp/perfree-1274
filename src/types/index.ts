@@ -30,6 +30,19 @@ export interface CostItem {
   description: string
 }
 
+export interface CostTrial {
+  id: string
+  cargoType: string
+  originStation: string
+  destinationStation: string
+  weight: number
+  baseCost: number
+  loadingCost: number
+  otherCost: number
+  totalCost: number
+  createdAt: string
+}
+
 export interface Contact {
   id: string
   name: string
@@ -74,6 +87,8 @@ export interface ReconciliationRecord {
   status: 'pending' | 'confirmed'
   waybillCount: number
   createdAt: string
+  confirmedAt?: string
+  downloadUrl?: string
 }
 
 export interface InvoiceApplication {
@@ -83,6 +98,10 @@ export interface InvoiceApplication {
   type: string
   status: 'pending' | 'approved' | 'issued'
   createdAt: string
+  approvedAt?: string
+  issuedAt?: string
+  invoiceNo?: string
+  downloadUrl?: string
 }
 
 export interface LoadingAppointment {

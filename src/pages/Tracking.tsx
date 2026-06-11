@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import {
   MapPin,
   Clock,
@@ -11,6 +11,48 @@ import {
 import { useStore } from '@/store'
 import { mockTrackingNodes, cargoCategories } from '@/data/mockData'
 import { cn } from '@/lib/utils'
+import type { Waybill, TrackingNode } from '@/types'
+
+function generateDefaultNodes(waybill: Waybill): TrackingNode[] {
+  const today = new Date()
+  const fmt = (d: Date) => d.toISOString().slice(5, 10).replace('-', '-') + ' ' + d.toTimeString().slice(0, 5)
+  const addDays = (n: number) => {
+    const d = new Date(today)
+    d.setDate(d.getDate() + n)
+    return d
+  }
+
+  switch (waybill.status) {
+    case 'pending':
+      return [
+        { id: `${waybill.id}-d1`, waybillId: waybill.id, station: waybill.originStation, time: '待审核', status: 'upcoming', description: '运单审核中，预计1-2个工作日完成' },
+        { id: `${waybill.id}-d2`, waybillId: waybill.id, station: '中转场站', time: '-', status: 'upcoming', description: '经停中转' },
+        { id: `${waybill.id}-d3`, waybillId: waybill.id, station: waybill.destinationStation, time: '-', status: 'upcoming', description: '终到站' },
+      ]
+    case 'approved':
+      return [
+        { id: `${waybill.id}-a1`, waybillId: waybill.id, station: waybill.originStation, time: '待装车', status: 'current', description: '审核通过，等待装车发运' },
+        { id: `${waybill.id}-a2`, waybillId: waybill.id, station: '中转场站', time: '-', status: 'upcoming', description: '经停中转' },
+        { id: `${waybill.id}-a3`, waybillId: waybill.id, station: waybill.destinationStation, time: '-', status: 'upcoming', description: '终到站' },
+      ]
+    case 'in_transit':
+      return [
+        { id: `${waybill.id}-t1`, waybillId: waybill.id, station: waybill.originStation, time: fmt(addDays(-1)), status: 'passed', description: '已发车' },
+        { id: `${waybill.id}-t2`, waybillId: waybill.id, station: '途中场站', time: fmt(addDays(0)), status: 'current', description: '当前在途，运输正常' },
+        { id: `${waybill.id}-t3`, waybillId: waybill.id, station: waybill.destinationStation, time: `预计 ${fmt(addDays(2))}`, status: 'upcoming', description: '预计到达' },
+      ]
+    case 'arrived':
+      return [
+        { id: `${waybill.id}-v1`, waybillId: waybill.id, station: waybill.originStation, time: fmt(addDays(-5)), status: 'passed', description: '已发车' },
+        { id: `${waybill.id}-v2`, waybillId: waybill.id, station: '中转场站', time: fmt(addDays(-3)), status: 'passed', description: '经停中转' },
+        { id: `${waybill.id}-v3`, waybillId: waybill.id, station: waybill.destinationStation, time: fmt(addDays(-1)), status: 'passed', description: '货物已到站，请及时卸车' },
+      ]
+    default:
+      return [
+        { id: `${waybill.id}-x1`, waybillId: waybill.id, station: waybill.originStation, time: '处理中', status: 'upcoming', description: '运单处理中' },
+      ]
+  }
+}
 
 export default function Tracking() {
   const waybills = useStore((s) => s.waybills)
@@ -21,7 +63,12 @@ export default function Tracking() {
     (w) => w.status === 'in_transit' || w.status === 'arrived' || w.status === 'approved' || w.status === 'pending'
   )
   const currentWaybill = waybills.find((w) => w.id === selectedWaybill)
-  const trackingNodes = mockTrackingNodes[selectedWaybill] || []
+  const trackingNodes = useMemo(() => {
+    const mock = mockTrackingNodes[selectedWaybill]
+    if (mock && mock.length > 0) return mock
+    if (currentWaybill) return generateDefaultNodes(currentWaybill)
+    return []
+  }, [selectedWaybill, currentWaybill])
   const arrivalNotifications = notifications.filter((n) => n.type === 'arrival')
   const warningNotifications = notifications.filter((n) => n.type === 'warning')
 

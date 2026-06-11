@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import {
   AlertTriangle,
   MessageSquare,
@@ -22,6 +22,16 @@ export default function Exception() {
   const addException = useStore((s) => s.addException)
   const sendMessage = useStore((s) => s.sendMessage)
   const [selectedSession, setSelectedSession] = useState(chatSessions[0]?.id || '')
+  const markSessionRead = useStore((s) => s.markSessionRead)
+
+  const handleSelectSession = (id: string) => {
+    setSelectedSession(id)
+    markSessionRead(id)
+  }
+
+  useEffect(() => {
+    if (selectedSession) markSessionRead(selectedSession)
+  }, [selectedSession, markSessionRead])
 
   const [excType, setExcType] = useState<ExceptionCase['type']>('damage')
   const [excWaybillId, setExcWaybillId] = useState('')
@@ -88,6 +98,7 @@ export default function Exception() {
         type: 'text',
       }
       sendMessage(selectedSession, reply)
+      markSessionRead(selectedSession)
     }, 1500)
   }
 
@@ -230,7 +241,7 @@ export default function Exception() {
               {chatSessions.map((session) => (
                 <button
                   key={session.id}
-                  onClick={() => setSelectedSession(session.id)}
+                  onClick={() => handleSelectSession(session.id)}
                   className={cn(
                     'w-full text-left p-4 border-b border-gray-50 transition-colors',
                     selectedSession === session.id ? 'bg-rail-50' : 'hover:bg-gray-50'

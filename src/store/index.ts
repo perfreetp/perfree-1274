@@ -1,6 +1,6 @@
 import { create } from 'zustand'
-import type { Waybill, Contact, ExceptionCase, ChatSession, ChatMessage, Notification, ReconciliationRecord, InvoiceApplication, LoadingAppointment } from '@/types'
-import { mockWaybills, mockContacts, mockExceptions, mockChatSessions, mockNotifications, mockReconciliations, mockInvoices, mockLoadingAppointments } from '@/data/mockData'
+import type { Waybill, Contact, ExceptionCase, ChatSession, ChatMessage, Notification, ReconciliationRecord, InvoiceApplication, LoadingAppointment, CostTrial } from '@/types'
+import { mockWaybills, mockContacts, mockExceptions, mockChatSessions, mockNotifications, mockReconciliations, mockInvoices, mockLoadingAppointments, mockCostTrials } from '@/data/mockData'
 
 interface AppState {
   waybills: Waybill[]
@@ -11,6 +11,7 @@ interface AppState {
   reconciliations: ReconciliationRecord[]
   invoices: InvoiceApplication[]
   loadingAppointments: LoadingAppointment[]
+  costTrials: CostTrial[]
 
   addWaybill: (waybill: Waybill) => void
   updateWaybillStatus: (id: string, status: Waybill['status']) => void
@@ -19,11 +20,14 @@ interface AppState {
   deleteContact: (id: string) => void
   addException: (exception: ExceptionCase) => void
   sendMessage: (sessionId: string, message: ChatMessage) => void
+  markSessionRead: (sessionId: string) => void
   markNotificationRead: (id: string) => void
   markAllNotificationsRead: () => void
   confirmReconciliation: (id: string) => void
   addInvoice: (invoice: InvoiceApplication) => void
+  updateInvoiceStatus: (id: string, status: InvoiceApplication['status']) => void
   addLoadingAppointment: (appointment: LoadingAppointment) => void
+  addCostTrial: (trial: CostTrial) => void
 }
 
 export const useStore = create<AppState>((set) => ({
@@ -35,6 +39,7 @@ export const useStore = create<AppState>((set) => ({
   reconciliations: mockReconciliations,
   invoices: mockInvoices,
   loadingAppointments: mockLoadingAppointments,
+  costTrials: mockCostTrials,
 
   addWaybill: (waybill) =>
     set((state) => ({ waybills: [...state.waybills, waybill] })),
@@ -73,9 +78,16 @@ export const useStore = create<AppState>((set) => ({
               messages: [...s.messages, message],
               lastMessage: message.content,
               lastTime: message.time,
-              unread: message.sender === 'service' ? s.unread + 1 : 0,
+              unread: message.sender === 'service' ? s.unread + 1 : s.unread,
             }
           : s
+      ),
+    })),
+
+  markSessionRead: (sessionId) =>
+    set((state) => ({
+      chatSessions: state.chatSessions.map((s) =>
+        s.id === sessionId ? { ...s, unread: 0 } : s
       ),
     })),
 
@@ -94,15 +106,46 @@ export const useStore = create<AppState>((set) => ({
   confirmReconciliation: (id) =>
     set((state) => ({
       reconciliations: state.reconciliations.map((r) =>
-        r.id === id ? { ...r, status: 'confirmed' as const } : r
+        r.id === id
+          ? {
+              ...r,
+              status: 'confirmed' as const,
+              confirmedAt: new Date().toLocaleDateString('zh-CN'),
+              downloadUrl: `reconciliation-${r.id}.pdf`,
+            }
+          : r
       ),
     })),
 
   addInvoice: (invoice) =>
     set((state) => ({ invoices: [...state.invoices, invoice] })),
 
+  updateInvoiceStatus: (id, status) =>
+    set((state) => ({
+      invoices: state.invoices.map((inv) => {
+        if (inv.id !== id) return inv
+        const now = new Date().toLocaleDateString('zh-CN')
+        if (status === 'approved') {
+          return { ...inv, status, approvedAt: now }
+        }
+        if (status === 'issued') {
+          return {
+            ...inv,
+            status,
+            issuedAt: now,
+            invoiceNo: `FP${Date.now()}`,
+            downloadUrl: `invoice-${inv.id}.pdf`,
+          }
+        }
+        return { ...inv, status }
+      }),
+    })),
+
   addLoadingAppointment: (appointment) =>
     set((state) => ({
       loadingAppointments: [...state.loadingAppointments, appointment],
     })),
+
+  addCostTrial: (trial) =>
+    set((state) => ({ costTrials: [trial, ...state.costTrials] })),
 }))

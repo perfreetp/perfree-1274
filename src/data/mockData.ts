@@ -1,4 +1,4 @@
-import type { Waybill, TrackingNode, CostItem, Contact, ExceptionCase, ChatSession, ReconciliationRecord, InvoiceApplication, LoadingAppointment, WarehouseSlot, Notification, CargoCategory, Station, VehicleType } from '@/types'
+import type { Waybill, TrackingNode, CostItem, Contact, ExceptionCase, ChatSession, ReconciliationRecord, InvoiceApplication, LoadingAppointment, WarehouseSlot, Notification, CargoCategory, Station, VehicleType, CostTrial } from '@/types'
 
 export const cargoCategories: CargoCategory[] = [
   { id: 'coal', name: '煤炭', icon: '🔥', rate: 0.085 },
@@ -122,10 +122,21 @@ export const mockTrackingNodes: Record<string, TrackingNode[]> = {
     { id: '6', waybillId: 'YD2026060002', station: '长沙南', time: '-', status: 'upcoming', description: '经停中转' },
     { id: '7', waybillId: 'YD2026060002', station: '广州南', time: '-', status: 'upcoming', description: '终到站' },
   ],
+  YD2026060003: [
+    { id: 'tn3-1', waybillId: 'YD2026060003', station: '沈阳南', time: '预计 06-12 10:00', status: 'upcoming', description: '计划发车' },
+    { id: 'tn3-2', waybillId: 'YD2026060003', station: '沈阳南', time: '待装车', status: 'upcoming', description: '等待装车发运' },
+    { id: 'tn3-3', waybillId: 'YD2026060003', station: '北京南', time: '-', status: 'upcoming', description: '经停中转' },
+    { id: 'tn3-4', waybillId: 'YD2026060003', station: '郑州东', time: '-', status: 'upcoming', description: '经停中转' },
+    { id: 'tn3-5', waybillId: 'YD2026060003', station: '成都北', time: '-', status: 'upcoming', description: '终到站' },
+  ],
   YD2026060004: [
     { id: '8', waybillId: 'YD2026060004', station: '南京东', time: '2026-06-05 12:00', status: 'passed', description: '已发车' },
     { id: '9', waybillId: 'YD2026060004', station: '合肥东', time: '2026-06-05 20:00', status: 'passed', description: '经停中转' },
     { id: '10', waybillId: 'YD2026060004', station: '郑州东', time: '2026-06-06 08:00', status: 'passed', description: '已到达' },
+  ],
+  YD2026060005: [
+    { id: 'tn5-1', waybillId: 'YD2026060005', station: '太原东', time: '审核未通过', status: 'upcoming', description: '运单已驳回，请重新提交' },
+    { id: 'tn5-2', waybillId: 'YD2026060005', station: '西安东', time: '-', status: 'upcoming', description: '终到站' },
   ],
 }
 
@@ -136,10 +147,25 @@ export const mockCostItems: Record<string, CostItem[]> = {
     { id: 'c3', waybillId: 'YD2026060001', category: '仓储费', amount: 1800, description: '中转站仓储 1天 × 5车 × 360元/车' },
     { id: 'c4', waybillId: 'YD2026060001', category: '其他费', amount: 800, description: '过轨费、取送车费等' },
   ],
+  YD2026060002: [
+    { id: 'c21', waybillId: 'YD2026060002', category: '运费', amount: 22680, description: '基本运费 180吨 × 0.105元/吨公里 × 1200公里' },
+    { id: 'c22', waybillId: 'YD2026060002', category: '装卸费', amount: 2700, description: '平车装卸费 180吨 × 15元/吨' },
+    { id: 'c23', waybillId: 'YD2026060002', category: '其他费', amount: 2970, description: '加固材料费、取送车费等' },
+  ],
+  YD2026060003: [
+    { id: 'c31', waybillId: 'YD2026060003', category: '运费', amount: 52920, description: '基本运费 450吨 × 0.098元/吨公里 × 1200公里' },
+    { id: 'c32', waybillId: 'YD2026060003', category: '装卸费', amount: 6750, description: '棚车装卸费 450吨 × 15元/吨' },
+    { id: 'c33', waybillId: 'YD2026060003', category: '其他费', amount: 1830, description: '棚车使用费、取送车费' },
+  ],
   YD2026060004: [
     { id: 'c5', waybillId: 'YD2026060004', category: '运费', amount: 29400, description: '基本运费 200吨 × 0.125元/吨公里 × 1176公里' },
     { id: 'c6', waybillId: 'YD2026060004', category: '装卸费', amount: 4000, description: '罐车装卸费' },
     { id: 'c7', waybillId: 'YD2026060004', category: '其他费', amount: 1800, description: '危险品附加费、取送车费' },
+  ],
+  YD2026060005: [
+    { id: 'c51', waybillId: 'YD2026060005', category: '运费', amount: 66240, description: '基本运费 600吨 × 0.092元/吨公里 × 1200公里' },
+    { id: 'c52', waybillId: 'YD2026060005', category: '装卸费', amount: 9000, description: '敞车装卸费 600吨 × 15元/吨' },
+    { id: 'c53', waybillId: 'YD2026060005', category: '其他费', amount: 1560, description: '取送车费等' },
   ],
 }
 
@@ -202,14 +228,14 @@ export const mockChatSessions: ChatSession[] = [
 ]
 
 export const mockReconciliations: ReconciliationRecord[] = [
-  { id: 'rc1', period: '2026年5月', totalAmount: 256800, status: 'confirmed', waybillCount: 8, createdAt: '2026-06-01' },
-  { id: 'rc2', period: '2026年4月', totalAmount: 198500, status: 'confirmed', waybillCount: 6, createdAt: '2026-05-02' },
+  { id: 'rc1', period: '2026年5月', totalAmount: 256800, status: 'confirmed', waybillCount: 8, createdAt: '2026-06-01', confirmedAt: '2026-06-02', downloadUrl: 'reconciliation-rc1.pdf' },
+  { id: 'rc2', period: '2026年4月', totalAmount: 198500, status: 'confirmed', waybillCount: 6, createdAt: '2026-05-02', confirmedAt: '2026-05-05', downloadUrl: 'reconciliation-rc2.pdf' },
   { id: 'rc3', period: '2026年6月', totalAmount: 78000, status: 'pending', waybillCount: 3, createdAt: '2026-06-10' },
 ]
 
 export const mockInvoices: InvoiceApplication[] = [
-  { id: 'inv1', amount: 256800, title: '华北煤炭集团', type: '增值税专用发票', status: 'issued', createdAt: '2026-06-02' },
-  { id: 'inv2', amount: 198500, title: '华北煤炭集团', type: '增值税专用发票', status: 'approved', createdAt: '2026-05-05' },
+  { id: 'inv1', amount: 256800, title: '华北煤炭集团', type: '增值税专用发票', status: 'issued', createdAt: '2026-06-02', approvedAt: '2026-06-03', issuedAt: '2026-06-05', invoiceNo: 'FP20260605001', downloadUrl: 'invoice-inv1.pdf' },
+  { id: 'inv2', amount: 198500, title: '华北煤炭集团', type: '增值税专用发票', status: 'approved', createdAt: '2026-05-05', approvedAt: '2026-05-06' },
   { id: 'inv3', amount: 78000, title: '华北煤炭集团', type: '增值税专用发票', status: 'pending', createdAt: '2026-06-10' },
 ]
 
@@ -234,4 +260,43 @@ export const mockNotifications: Notification[] = [
   { id: 'n3', type: 'system', title: '系统公告', content: '6月15日起部分线路运价调整，详情请查看运价公告', time: '2026-06-08 09:00', read: true },
   { id: 'n4', type: 'rate', title: '运价调整', content: '化工品类运价上调5%，自2026年6月15日起执行', time: '2026-06-07 14:00', read: false },
   { id: 'n5', type: 'route', title: '线路变更', content: '武汉至广州线路因施工临时调整，预计6月20日恢复', time: '2026-06-06 10:00', read: true },
+]
+
+export const mockCostTrials: CostTrial[] = [
+  {
+    id: 'CT20260600001',
+    cargoType: 'coal',
+    originStation: '北京南',
+    destinationStation: '上海虹桥',
+    weight: 300,
+    baseCost: 35700,
+    loadingCost: 4500,
+    otherCost: 2600,
+    totalCost: 42800,
+    createdAt: '2026-06-08 09:20',
+  },
+  {
+    id: 'CT20260600002',
+    cargoType: 'steel',
+    originStation: '武汉东',
+    destinationStation: '广州南',
+    weight: 180,
+    baseCost: 22680,
+    loadingCost: 2700,
+    otherCost: 2970,
+    totalCost: 28350,
+    createdAt: '2026-06-09 14:05',
+  },
+  {
+    id: 'CT20260600003',
+    cargoType: 'grain',
+    originStation: '沈阳南',
+    destinationStation: '成都北',
+    weight: 450,
+    baseCost: 52920,
+    loadingCost: 6750,
+    otherCost: 1830,
+    totalCost: 61500,
+    createdAt: '2026-06-10 08:05',
+  },
 ]

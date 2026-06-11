@@ -23,7 +23,7 @@ export default function Loading() {
   const [selectedTimeSlot, setSelectedTimeSlot] = useState('')
   const [selectedMethod, setSelectedMethod] = useState('')
 
-  const approvedWaybills = waybills.filter((w) => w.status === 'approved')
+  const approvedWaybills = waybills.filter((w) => w.status === 'approved' || w.status === 'pending')
   const currentWaybill = waybills.find((w) => w.id === selectedWaybill)
 
   const timeSlots = [
@@ -92,7 +92,7 @@ export default function Loading() {
                 value={selectedWaybill}
                 onChange={(e) => setSelectedWaybill(e.target.value)}
               >
-                <option value="">请选择已审核通过的运单</option>
+                <option value="">请选择已审核或待审核的运单</option>
                 {approvedWaybills.map((w) => {
                   const cargo = cargoCategories.find((c) => c.id === w.cargoType)
                   return (
